@@ -4,13 +4,16 @@
 
 from __future__ import division, unicode_literals
 
+import os
 import re
 import six
+import xml.etree.cElementTree as ET
 
 from monty.io import zopen
 
 from monty.re import regrep
 from collections import defaultdict
+from scipy.constants import physical_constants
 
 from pymatgen.core.periodic_table import Element
 from pymatgen.core.lattice import Lattice
@@ -27,6 +30,9 @@ __version__ = "0.1"
 __maintainer__ = "Shyue Ping Ong"
 __email__ = "ongsp@ucsd.edu"
 __date__ = "3/27/15"
+
+bohr_to_m = physical_constants['Bohr radius'][0]
+bohr_to_a = bohr_to_m*1e10
 
 
 class PWInput(object):
@@ -435,3 +441,191 @@ class PWOutput(object):
     @property
     def lattice_type(self):
         return self.data["lattice_type"]
+
+# TODO: calculate optimal Kpoint density
+class PWStaticSet():
+    """Return a PWInput object for a typical PWscf static calculation
+    """
+
+    # TODO: set up default pseudopotentials for everything
+    def __init__(self, struct, pseudo, pseudo_dir=None,
+                 user_kpoints_settings=None):
+        if pseudo_dir is None:
+            pseudo_dir = os.environ['PSEUDO_DIR']
+        pw_relax_dict = {
+            'control': {
+                'calculation': 'scf',  # do a static calculation
+                'prefix': struct.composition.reduced_formula,
+                'outdir': './',
+                'etot_conv_thr': 10 ** -6,
+            # energy convergence criteria for relaxation. Default 10^-4
+                'forc_conv_thr': 10 ** -5,
+            # force convergence criteria for relaxation Default 10^-3
+                'pseudo_dir': pseudo_dir
+            },
+            'system': {
+                # the highest non-noble gas recommended cutoff is Hf: 120 Ry, follwed by Fe: 95 Ry. We'll do 130 here and relax is 1.5* for safety
+                'ecutwfc': 130,
+                # TODO: set this automatically. Determine the cutoffs independently
+                'ecutrho': 6 * 130,
+                'ntyp': len(struct.types_of_specie),
+                # default is 4*ecutwfc. Manual says should be higher for PAW, esp. if vacuum or non-linear core
+            },
+            'kpoints_shift': (0, 0, 0)
+        }
+        # automatic kpoints mode and grid
+        if user_kpoints_settings:
+            raise NotImplementedError()
+        else:
+            pw_relax_dict['kpoints_mode'] = 'automatic'
+            # set to 'gamma' if hexagonal
+            pw_relax_dict['kpoints_grid'] = (11, 11, 11)
+
+        # pass only the correct psedopotentials
+        pseudo = {str(sp): pseudo[str(sp)] for sp in struct.species}
+        self.pwinput = PWInput(struct, pseudo=pseudo, **pw_relax_dict)
+
+    def write_input(self, filename):
+        self.pwinput.write_file(filename)
+
+# TODO: Refactor to subclass PWStaticSet
+class PWRelaxSet():
+    """Return a PWInput object for a typical PWscf relaxation
+    """
+
+    # TODO: set up default pseudopotentials for everything
+    def __init__(self, struct, pseudo, pseudo_dir=None,
+                 user_kpoints_settings=None):
+        if pseudo_dir is None:
+            pseudo_dir = os.environ['PSEUDO_DIR']
+        pw_relax_dict = {
+            'control': {
+                'calculation': 'vc-relax',  # do a variable cell relaxation
+                'prefix': struct.composition.reduced_formula,
+                'outdir': './',
+                'nstep': 100,  # take 100 ionic steps
+                'etot_conv_thr': 10 ** -6,
+            # energy convergence criteria for relaxation. Default 10^-4
+                'forc_conv_thr': 10 ** -5,
+            # force convergence criteria for relaxation Default 10^-3
+                'pseudo_dir': pseudo_dir
+            },
+            'system': {
+                'ecutwfc': 200,
+            # TODO: set this automatically. Determine the cutoffs independently
+                'ecutrho': 6 * 200,
+                'ntyp': len(struct.types_of_specie),
+            # default is 4*ecutwfc. Manual says should be higher for PAW, esp. if vacuum or non-linear core
+            },
+            'kpoints_shift': (0, 0, 0)
+        }
+        # automatic kpoints mode and grid
+        if user_kpoints_settings:
+            raise NotImplementedError()
+        else:
+            pw_relax_dict['kpoints_mode'] = 'automatic'
+            # set to 'gamma' if hexagonal
+            pw_relax_dict['kpoints_grid'] = (11, 11, 11)
+
+        # pass only the correct psedopotentials
+        pseudo = {str(sp): pseudo[str(sp)] for sp in struct.species}
+        self.pwinput = PWInput(struct, pseudo=pseudo, **pw_relax_dict)
+
+    def write_input(self, filename):
+        self.pwinput.write_file(filename)
+
+
+class PWData(PWOutput):
+    """Open and provide an interface for parsing the XML
+    """
+
+    def __init__(self, xml_filename, output_filename):
+        with open(xml_filename) as f:
+            parsed_xml = ET.parse(f)
+        self.root = parsed_xml.getroot()
+
+        # properties that can be calculated
+        self._structure = None
+        # get a PWOutput from the output file
+        super().__init__(output_filename)
+
+    @staticmethod
+    def _format_str(string):
+        """Convert a string with excess spaces and line endings to a float
+        """
+        return [x for x in string.replace('\n', '').split(' ') if x != ''][0]
+
+    @property
+    def structure(self):
+        if self._structure is not None:
+            return self._structure
+        else:
+            # get lattice vectors as direct coordinates (units Bohr)
+            cell = self.root.find('CELL')
+            lattice_vectors = cell.find('DIRECT_LATTICE_VECTORS').getchildren()[
+                              1:]
+            lattice_vectors = [[float(val) * bohr_to_a for val in
+                                v.text.replace('\n', '').split(' ') if
+                                val != ''] for v in lattice_vectors]
+            # get atomic positions as cartesian coordinates (units Bohr)
+            atoms = []
+            positions = []
+            for el in self.root.find('IONS').getchildren():
+                if 'ATOM.' in el.tag:
+                    attribs = el.attrib
+                    atoms.append(attribs['SPECIES'].replace(' ', ''))
+                    position = [float(val) * bohr_to_a for val in
+                                attribs['tau'].split(' ') if val != '']
+                    positions.append(position)
+            # create the structure:
+            lattice = Lattice(lattice_vectors)
+            self._structure = Structure(lattice, atoms, positions,
+                                        coords_are_cartesian=True)
+            return self._structure
+
+    def as_dict(self):
+        natoms = len(self.structure.species)
+        return {
+            'formula_pretty': self.structure.composition.reduced_formula,
+            'formula': self.structure.formula,
+            'natoms': natoms,
+            'kpoints': {
+                'grid': tuple(int(v) for _, v in
+                              self.root.find('BRILLOUIN_ZONE').find(
+                                  'MONKHORST_PACK_GRID').attrib.items()),
+                'shift': tuple(int(v) for _, v in
+                               self.root.find('BRILLOUIN_ZONE').find(
+                                   'MONKHORST_PACK_OFFSET').attrib.items()),
+                'nkpoints': int(self._format_str(
+                    self.root.find('BRILLOUIN_ZONE').find(
+                        'NUMBER_OF_K-POINTS').text))
+            },
+            'output': {
+                'wfc_cutoff': float(self._format_str(
+                    self.root.find('PLANE_WAVES').find('WFC_CUTOFF').text)),
+                'rho_cutoff': float(self._format_str(
+                    self.root.find('PLANE_WAVES').find('RHO_CUTOFF').text)),
+                'number_of_bands': int(self._format_str(
+                    self.root.find('BAND_STRUCTURE_INFO').find(
+                        'NUMBER_OF_BANDS').text)),
+                'number_of_electrons': float(self._format_str(
+                    self.root.find('BAND_STRUCTURE_INFO').find(
+                        'NUMBER_OF_ELECTRONS').text)),
+                'fermi_energy': float(self._format_str(
+                    self.root.find('BAND_STRUCTURE_INFO').find(
+                        'FERMI_ENERGY').text)),
+                'units_energy': self._format_str(
+                    self.root.find('BAND_STRUCTURE_INFO').find(
+                        'UNITS_FOR_ENERGIES').attrib['UNITS']),
+                'structure': self.structure.as_dict(),
+                'density': self.structure.density,
+                'energy': self.final_energy / 2.0,  # to Hartrees
+                'energy_per_atom': self.final_energy / 2.0 / natoms,
+            }
+        }
+
+    @property
+    def energy_per_atom(self):
+        return self.final_energy / 2.0 / len(self.structure.species)
+
+
