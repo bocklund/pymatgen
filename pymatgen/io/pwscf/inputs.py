@@ -208,9 +208,9 @@ class PWInput(object):
             elif "ATOMIC_SPECIES" in line:
                 return ("pseudo", )
             elif "K_POINTS" in line:
-                return ("kpoints", line.split("{")[1][:-1])
+                return ("kpoints", line.split(" ")[1])
             elif "CELL_PARAMETERS" in line or "ATOMIC_POSITIONS" in line:
-                return ("structure", line.split("{")[1][:-1])
+                return ("structure", line.split(" ")[1])
             elif line == "/":
                 return None
             else:
@@ -270,7 +270,12 @@ class PWInput(object):
                     lattice += [ float(m_l.group(1)), float(m_l.group(2)), float(m_l.group(3)) ]
                 elif m_p:
                     site_properties["pseudo"].append(pseudo[m_p.group(1)]["pseudopot"])
-                    species += [pseudo[m_p.group(1)]["pseudopot"].split(".")[0]]
+                    # Assumes that the species name is the name of the actual species.
+                    # Previously we based it on the name of the pseudopotential,
+                    # which not all are nicely named. Downside of this method is
+                    # it doesn't support something like Fe1 Fe2. Maybe a regex or
+                    # try to match with the periodic table?
+                    species += [m_p.group(1)]
                     coords += [[float(m_p.group(2)), float(m_p.group(3)), float(m_p.group(4))]]
 
                     for k, v in site_properties.items():
@@ -280,7 +285,6 @@ class PWInput(object):
                     coords_are_cartesian = True
                 elif mode[1] == "crystal":
                     coords_are_cartesian = False
-
         structure = Structure(Lattice(lattice), species, coords,
                               coords_are_cartesian=coords_are_cartesian,
                               site_properties=site_properties)
@@ -298,8 +302,8 @@ class PWInput(object):
             key: PWINPUT parameter key
             val: Actual value of PWINPUT parameter.
         """
-        float_keys = ('etot_conv_thr','forc_conv_thr','conv_thr','Hubbard_U','Hubbard_J0','defauss',
-                      'starting_magnetization',)
+        float_keys = ('etot_conv_thr','forc_conv_thr','conv_thr','Hubbard_U','Hubbard_J0','degauss',
+                      'starting_magnetization', 'ecutwfc', 'ecutrho', 'ecutfock')
 
         int_keys = ('nstep','iprint','nberrycyc','gdir','nppstr','ibrav','nat','ntyp','nbnd','nr1',
                     'nr2','nr3','nr1s','nr2s','nr3s','nspin','nqx1','nqx2','nqx3','lda_plus_u_kind',
@@ -350,10 +354,9 @@ class PWInput(object):
         if "false" in val.lower():
             return False
 
-        m = re.match(r"^[\"|'](.+)[\"|']$", val)
+        m = re.match(r"^[\"|'](.+)[\"|'].?$", val)
         if m:
             return m.group(1)
-
 
 class PWInputError(BaseException):
     pass

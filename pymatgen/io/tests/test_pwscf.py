@@ -71,6 +71,58 @@ CELL_PARAMETERS angstrom
 """
         self.assertEqual(pw.__str__().strip(), ans.strip())
 
+    def test_read_write_equivalence(self):
+        """PWInput can read the structure it writes
+        """
+        s = self.get_structure("Li2O")
+
+        pw = PWInput(s,
+                     control={"calculation": "scf", "pseudo_dir": './'},
+                     pseudo={"Li": "Li.pbe-n-kjpaw_psl.0.1.UPF",
+                             "O": "O.pbe-n-kjpaw_psl.0.1.UPF"},
+                     system={"ecutwfc": 50})
+        ans = """&CONTROL
+  calculation = 'scf',
+  pseudo_dir = './',
+/
+&SYSTEM
+  ecutwfc = 50,
+  ibrav = 0,
+  nat = 3,
+  ntyp = 2,
+/
+&ELECTRONS
+/
+&IONS
+/
+&CELL
+/
+ATOMIC_SPECIES
+  Li  6.9410 Li.pbe-n-kjpaw_psl.0.1.UPF
+  O  15.9994 O.pbe-n-kjpaw_psl.0.1.UPF
+ATOMIC_POSITIONS crystal
+  Li 0.250000 0.250000 0.250000
+  Li 0.750000 0.750000 0.750000
+  O 0.000000 0.000000 0.000000
+K_POINTS automatic
+  1 1 1 0 0 0
+CELL_PARAMETERS angstrom
+  -2.305000 -2.305000 0.000000
+  -2.305000 0.000000 -2.305000
+  0.000000 -2.305000 -2.305000
+"""
+        pw_read = PWInput.from_string(ans)
+        # we have to have a small custom version of __eq__
+        self.assertIsNotNone(pw_read.structure, msg='Structure read from string is None')
+        self.assertEqual(len(pw.structure), len(pw_read.structure),  msg='Structures do not have the same number of sites')
+        # Handle float precision and original and read structures
+        self.assertArrayAlmostEqual(pw.structure.lattice.matrix,pw_read.structure.lattice.matrix, err_msg='Structures are not equal within 7 decimal places')
+        # We can't get site properties like charge from the input file, so we just check that the elements are there
+        for specie in pw.structure.species:
+            self.assertIn(specie.element, pw_read.structure.species, msg='Site {} not in read structure (sites: {})'.format(specie, pw_read.structure.species))
+        # we construct this section dict manually because of the system parameters that are added from the struct
+        sections_dict = {'control': {'calculation': 'scf', 'pseudo_dir': './'}, 'system': {'ecutwfc': 50.0, 'ibrav': 0, 'nat': 3, 'ntyp': 2}, 'electrons': {}, 'ions': {}, 'cell': {}}
+        self.assertDictEqual(sections_dict, pw_read.sections, msg='Written and read parameter dictionaries are inconsistent')
 
 class PWOuputTest(PymatgenTest):
 
