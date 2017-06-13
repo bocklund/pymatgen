@@ -575,7 +575,7 @@ class PWInputSet(MSONable):
         self.pwinput = PWInput(structure, pseudo=self.pseudo, **self.pw_input_dict)
 
     def write_input(self, path):
-        filename = self.structure.composition.reduced_formula + '.in'
+        filename = os.path.join(path, self.structure.composition.reduced_formula + '.in')
         self.pwinput.write_file(filename)
 
     def as_dict(self, verbosity=2):
