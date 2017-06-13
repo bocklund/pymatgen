@@ -532,12 +532,43 @@ class PWOutput(object):
 
 class PWInputSet(MSONable):
     """
-    Base class for PWscf input sets
-    """
+    Base class for input sets in PWscf.
 
-    def __init__(self, structure, **kwargs):
+    Except for the kpoints, which are currently not implemented (planned to be
+    implemented as in VaspInputSet objects), all subclasses need to do are to
+    pass the relevant pw_input_dict and reasonable defaults are supplied by this
+    class.
+    """
+    def __init__(self, structure, pseudo=None, pw_input_dict=None, pseudo_dir=None, user_kpoints_settings=None):
+        """
+        Create a PWInput object from the passed structure and pw_input_dict
+        Args:
+            structure (Structure): pymatgen Structure object
+            pseudo (dict): Dictionary of pseudopotential files located in
+                pseudo_dir formatted as {'Si': 'si.pbe-paw.upf'} for the element
+                and the name of the pseuopotential.
+            pw_input_dict (dict): Dictionary of input settings corresponding to
+                the namelists defined as in the PWInput object
+            pseudo_dir (str): String of the full path to the directory containing pseudopotentials.
+            user_kpoints_settings (dict): Not yet implemented. Will be like VaspInputSets.
+        """
+        pw_input_dict = pw_input_dict or {}
+        pseudo_dir = pseudo_dir or os.environ.get('PSEUDO_DIR') or os.path.expanduser('~/pseudo')
+        # pass only the correct psedopotentials
+        pseudo = pseudo or SSSP_accurate
+        if user_kpoints_settings:
+            raise NotImplementedError()
+        else:
+            # automatic kpoints mode and grid
+            # TODO: set to 'gamma' if hexagonal structure
+            pw_input_dict['kpoints_mode'] = 'automatic'
+            pw_input_dict['kpoints_grid'] = (11, 11, 11)
+        self.user_kpoints_settings = user_kpoints_settings
+        self.pseudo = {str(sp): pseudo[str(sp)] for sp in structure.species}
         self.structure = structure
-        self.kwargs = kwargs
+        self.pseudo_dir = pseudo_dir
+        self.pw_input_dict = pw_input_dict
+        self.pwinput = PWInput(structure, pseudo=self.pseudo, **self.pw_input_dict)
 
     def write_input(self, path):
         filename = self.structure.composition.reduced_formula + '.in'
@@ -553,17 +584,8 @@ class PWInputSet(MSONable):
 class PWStaticSet(PWInputSet):
     """Return a PWInput object for a typical PWscf static calculation
     """
-
-    # TODO: set up default pseudopotentials for everything
-    def __init__(self, structure, pseudo=None, pseudo_dir=None,
-                 user_kpoints_settings=None, **kwargs):
-        self.pseudo_dir = pseudo_dir
-        self.user_kpoints_settings = user_kpoints_settings
-        # use the SSSP accurate pseudopotentials
-        self.pseudo = pseudo or SSSP_accurate
-        if pseudo_dir is None:
-            pseudo_dir = os.environ['PSEUDO_DIR']
-        pw_relax_dict = {
+    def __init__(self, structure, pseudo=None, pseudo_dir=None, user_kpoints_settings=None):
+        pw_static_dict = {
             'control': {
                 'calculation': 'scf',  # do a static calculation
                 'prefix': structure.composition.reduced_formula,
@@ -584,33 +606,12 @@ class PWStaticSet(PWInputSet):
             },
             'kpoints_shift': (0, 0, 0)
         }
-        # automatic kpoints mode and grid
-        if user_kpoints_settings:
-            raise NotImplementedError()
-        else:
-            pw_relax_dict['kpoints_mode'] = 'automatic'
-            # set to 'gamma' if hexagonal
-            pw_relax_dict['kpoints_grid'] = (11, 11, 11)
+        super(PWStaticSet, self).__init__(structure, pseudo=pseudo, pw_input_dict=pw_static_dict, pseudo_dir=pseudo_dir, user_kpoints_settings=user_kpoints_settings)
 
-        # pass only the correct psedopotentials
-        self.pseudo = {str(sp): self.pseudo[str(sp)] for sp in structure.species}
-        self.pwinput = PWInput(structure, pseudo=self.pseudo, **pw_relax_dict)
-        super(PWStaticSet, self).__init__(structure, **kwargs)
-
-# TODO: Refactor to subclass PWStaticSet
 class PWRelaxSet(PWInputSet):
     """Return a PWInput object for a typical PWscf relaxation
     """
-
-    # TODO: set up default pseudopotentials for everything
-    def __init__(self, structure, pseudo=None, pseudo_dir=None,
-                 user_kpoints_settings=None, **kwargs):
-        self.pseudo_dir = pseudo_dir
-        self.user_kpoints_settings = user_kpoints_settings
-        # use the SSSP accurate pseudopotentials
-        self.pseudo = pseudo or SSSP_accurate
-        if pseudo_dir is None:
-            pseudo_dir = os.environ['PSEUDO_DIR']
+    def __init__(self, structure, pseudo=None, pseudo_dir=None, user_kpoints_settings=None):
         pw_relax_dict = {
             'control': {
                 'calculation': 'relax',  # do a variable cell relaxation
@@ -632,18 +633,7 @@ class PWRelaxSet(PWInputSet):
             },
             'kpoints_shift': (0, 0, 0)
         }
-        # automatic kpoints mode and grid
-        if user_kpoints_settings:
-            raise NotImplementedError()
-        else:
-            pw_relax_dict['kpoints_mode'] = 'automatic'
-            # set to 'gamma' if hexagonal
-            pw_relax_dict['kpoints_grid'] = (11, 11, 11)
-
-        # pass only the correct psedopotentials
-        self.pseudo = {str(sp): self.pseudo[str(sp)] for sp in structure.species}
-        self.pwinput = PWInput(structure, pseudo=self.pseudo, **pw_relax_dict)
-        super(PWRelaxSet, self).__init__(structure, **kwargs)
+        super(PWRelaxSet, self).__init__(structure, pseudo=pseudo, pw_input_dict=pw_relax_dict, pseudo_dir=pseudo_dir, user_kpoints_settings=user_kpoints_settings)
 
 
 class PWData(PWOutput):
