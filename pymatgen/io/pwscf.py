@@ -539,7 +539,7 @@ class PWInputSet(MSONable):
     pass the relevant pw_input_dict and reasonable defaults are supplied by this
     class.
     """
-    def __init__(self, structure, pseudo=None, pw_input_dict=None, pseudo_dir=None, user_kpoints_settings=None):
+    def __init__(self, structure, pseudo=None, pw_input_dict=None, pseudo_dir=None, user_input_settings=None, user_kpoints_settings=None):
         """
         Create a PWInput object from the passed structure and pw_input_dict
         Args:
@@ -556,6 +556,9 @@ class PWInputSet(MSONable):
         pseudo_dir = pseudo_dir or os.environ.get('PSEUDO_DIR') or os.path.expanduser('~/pseudo')
         # pass only the correct psedopotentials
         pseudo = pseudo or SSSP_accurate
+        if user_input_settings:
+            for key, val in user_input_settings.items():
+                pw_input_dict[key].update(val)
         if user_kpoints_settings:
             raise NotImplementedError()
         else:
@@ -568,6 +571,7 @@ class PWInputSet(MSONable):
         self.structure = structure
         self.pseudo_dir = pseudo_dir
         self.pw_input_dict = pw_input_dict
+        self.user_input_settings = user_input_settings
         self.pwinput = PWInput(structure, pseudo=self.pseudo, **self.pw_input_dict)
 
     def write_input(self, path):
@@ -584,7 +588,7 @@ class PWInputSet(MSONable):
 class PWStaticSet(PWInputSet):
     """Return a PWInput object for a typical PWscf static calculation
     """
-    def __init__(self, structure, pseudo=None, pseudo_dir=None, user_kpoints_settings=None):
+    def __init__(self, structure, pseudo=None, pseudo_dir=None, user_input_settings=None, user_kpoints_settings=None):
         pw_static_dict = {
             'control': {
                 'calculation': 'scf',  # do a static calculation
@@ -606,12 +610,12 @@ class PWStaticSet(PWInputSet):
             },
             'kpoints_shift': (0, 0, 0)
         }
-        super(PWStaticSet, self).__init__(structure, pseudo=pseudo, pw_input_dict=pw_static_dict, pseudo_dir=pseudo_dir, user_kpoints_settings=user_kpoints_settings)
+        super(PWStaticSet, self).__init__(structure, pseudo=pseudo, pw_input_dict=pw_static_dict, pseudo_dir=pseudo_dir, user_input_settings=user_input_settings, user_kpoints_settings=user_kpoints_settings)
 
 class PWRelaxSet(PWInputSet):
     """Return a PWInput object for a typical PWscf relaxation
     """
-    def __init__(self, structure, pseudo=None, pseudo_dir=None, user_kpoints_settings=None):
+    def __init__(self, structure, pseudo=None, pseudo_dir=None, user_input_settings=None, user_kpoints_settings=None):
         pw_relax_dict = {
             'control': {
                 'calculation': 'relax',  # do a variable cell relaxation
@@ -633,7 +637,7 @@ class PWRelaxSet(PWInputSet):
             },
             'kpoints_shift': (0, 0, 0)
         }
-        super(PWRelaxSet, self).__init__(structure, pseudo=pseudo, pw_input_dict=pw_relax_dict, pseudo_dir=pseudo_dir, user_kpoints_settings=user_kpoints_settings)
+        super(PWRelaxSet, self).__init__(structure, pseudo=pseudo, pw_input_dict=pw_relax_dict, pseudo_dir=pseudo_dir, user_input_settings=user_input_settings, user_kpoints_settings=user_kpoints_settings)
 
 
 class PWData(PWOutput):
