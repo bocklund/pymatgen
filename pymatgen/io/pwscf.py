@@ -591,22 +591,18 @@ class PWStaticSet(PWInputSet):
     def __init__(self, structure, pseudo=None, pseudo_dir=None, user_input_settings=None, user_kpoints_settings=None):
         pw_static_dict = {
             'control': {
-                'calculation': 'scf',  # do a static calculation
+                'calculation': 'scf',
                 'prefix': structure.composition.reduced_formula,
                 'outdir': './',
                 'etot_conv_thr': 10 ** -6,
-            # energy convergence criteria for relaxation. Default 10^-4
                 'forc_conv_thr': 10 ** -5,
-            # force convergence criteria for relaxation Default 10^-3
                 'pseudo_dir': pseudo_dir
             },
             'system': {
-                # the highest non-noble gas recommended cutoff is Hf: 120 Ry, follwed by Fe: 95 Ry. We'll do 130 here and relax is 1.5* for safety
                 'ecutwfc': 130,
                 # TODO: set this automatically. Determine the cutoffs independently
                 'ecutrho': 6 * 130,
                 'ntyp': len(structure.types_of_specie),
-                # default is 4*ecutwfc. Manual says should be higher for PAW, esp. if vacuum or non-linear core
             },
             'kpoints_shift': (0, 0, 0)
         }
@@ -618,14 +614,12 @@ class PWRelaxSet(PWInputSet):
     def __init__(self, structure, pseudo=None, pseudo_dir=None, user_input_settings=None, user_kpoints_settings=None):
         pw_relax_dict = {
             'control': {
-                'calculation': 'relax',  # do a variable cell relaxation
+                'calculation': 'relax',
                 'prefix': structure.composition.reduced_formula,
                 'outdir': './',
-                'nstep': 100,  # take 100 ionic steps
+                'nstep': 100,
                 'etot_conv_thr': 10 ** -6,
-            # energy convergence criteria for relaxation. Default 10^-4
                 'forc_conv_thr': 10 ** -5,
-            # force convergence criteria for relaxation Default 10^-3
                 'pseudo_dir': pseudo_dir
             },
             'system': {
@@ -633,7 +627,6 @@ class PWRelaxSet(PWInputSet):
             # TODO: set this automatically. Determine the cutoffs independently
                 'ecutrho': 6 * 200,
                 'ntyp': len(structure.types_of_specie),
-            # default is 4*ecutwfc. Manual says should be higher for PAW, esp. if vacuum or non-linear core
             },
             'kpoints_shift': (0, 0, 0)
         }
