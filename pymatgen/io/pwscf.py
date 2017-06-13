@@ -10,7 +10,7 @@ import six
 import xml.etree.cElementTree as ET
 
 from monty.io import zopen
-
+from monty.json import MSONable
 from monty.re import regrep
 from collections import defaultdict
 from scipy.constants import physical_constants
@@ -34,6 +34,94 @@ __date__ = "3/27/15"
 bohr_to_m = physical_constants['Bohr radius'][0]
 bohr_to_a = bohr_to_m*1e10
 
+
+SSSP_accurate = {
+'Al': 'Al.pbe-n-kjpaw_psl.1.0.0.UPF',
+'Os': 'Os.pbe-spfn-rrkjus_psl.1.0.0.UPF',
+'Ar': 'Ar.pbe-n-rrkjus_psl.1.0.0.UPF',
+'P': 'P.pbe-n-rrkjus_psl.1.0.0.UPF',
+'As': 'As.pbe-n-rrkjus_psl.0.2.UPF',
+'Pb': 'Pb.pbe-dn-kjpaw_psl.0.2.2.UPF',
+'Au': 'Au_ONCV_PBE-1.0.upf',
+'Pd': 'Pd.pbe-spn-kjpaw_psl.1.0.0.UPF',
+'B': 'B.pbe-n-kjpaw_psl.0.1.UPF',
+'Pm': 'Pm.GGA-PBE-paw-v1.0.UPF',
+'Ba': 'Ba_ONCV_PBE-1.0.upf',
+'Po': 'Po.pbe-dn-rrkjus_psl.1.0.0.UPF',
+'Be': 'Be_ONCV_PBE-1.0.upf',
+'Pr': 'Pr.GGA-PBE-paw-v1.0.UPF',
+'Bi': 'Bi.pbe-dn-kjpaw_psl.0.2.2.UPF',
+'Pt': 'Pt.pbe-spfn-rrkjus_psl.1.0.0.UPF',
+'C': 'C_pbe_v1.2.uspp.F.UPF',
+'Ca': 'Ca_pbe_v1.uspp.F.UPF',
+'Rb': 'Rb_ONCV_PBE-1.0.upf',
+'Cd': 'Cd.pbe-dn-rrkjus_psl.0.3.1.UPF',
+'Re': 'Re_pbe_v1.2.uspp.F.UPF',
+'Ce': 'Ce.GGA-PBE-paw-v1.0.UPF',
+'Rh': 'Rh.pbe-spn-kjpaw_psl.1.0.0.UPF',
+'Cl': 'Cl.pbe-n-rrkjus_psl.1.0.0.UPF',
+'Rn': 'Rn.pbe-dn-rrkjus_psl.1.0.0.UPF',
+'Co': 'Co_pbe_v1.2.uspp.F.UPF',
+'Ru': 'Ru_ONCV_PBE-1.0.upf',
+'Cs': 'Cs_pbe_v1.uspp.F.UPF',
+'S': 'S_pbe_v1.2.uspp.F.UPF',
+'Cu': 'Cu_pbe_v1.2.uspp.F.UPF',
+'Sc': 'Sc_pbe_v1.uspp.F.UPF',
+'Dy': 'Dy.GGA-PBE-paw-v1.0.UPF',
+'Se': 'Se_pbe_v1.uspp.F.UPF',
+'Er': 'Er.GGA-PBE-paw-v1.0.UPF',
+'Si': 'Si.pbe-n-rrkjus_psl.1.0.0.UPF',
+'Eu': 'Eu.GGA-PBE-paw-v1.0.UPF',
+'Sm': 'Sm.GGA-PBE-paw-v1.0.UPF',
+'Fe': 'Fe.pbe-spn-kjpaw_psl.0.2.1.UPF',
+'Sn': 'Sn_pbe_v1.uspp.F.UPF',
+'Ga': 'Ga.pbe-dn-kjpaw_psl.1.0.0.UPF',
+'Sr': 'Sr.pbe-spn-rrkjus_psl.1.0.0.UPF',
+'Gd': 'Gd.GGA-PBE-paw-v1.0.UPF',
+'Ta': 'Ta.pbe-spfn-rrkjus_psl.1.0.0.UPF',
+'Ge': 'Ge.pbe-dn-kjpaw_psl.1.0.0.UPF',
+'Tb': 'Tb.GGA-PBE-paw-v1.0.UPF',
+'H': 'H.pbe-rrkjus_psl.0.1.UPF',
+'Tc': 'Tc_ONCV_PBE-1.0.upf',
+'He': 'He_ONCV_PBE-1.0.upf',
+'Te': 'Te_pbe_v1.uspp.F.UPF',
+'Hf': 'Hf.pbe-spdfn-kjpaw_psl.1.0.0.UPF',
+'Tl': 'Tl.pbe-dn-rrkjus_psl.1.0.0.UPF',
+'Hg': 'Hg_pbe_v1.uspp.F.UPF',
+'Tm': 'Tm.GGA-PBE-paw-v1.0.UPF',
+'Ho': 'Ho.GGA-PBE-paw-v1.0.UPF',
+'V': 'V_pbe_v1.uspp.F.UPF',
+'I': 'I_pbe_v1.uspp.F.UPF',
+'W': 'W_pbe_v1.2.uspp.F.UPF',
+'In': 'In.pbe-dn-rrkjus_psl.0.2.2.UPF',
+'Xe': 'Xe.pbe-dn-rrkjus_psl.1.0.0.UPF',
+'Ir': 'Ir_pbe_v1.2.uspp.F.UPF',
+'Y': 'Y_pbe_v1.uspp.F.UPF',
+'K': 'K.pbe-spn-rrkjus_psl.1.0.0.UPF',
+'Yb': 'Yb.GGA-PBE-paw-v1.0.UPF',
+'Kr': 'Kr.pbe-n-rrkjus_psl.0.2.3.UPF',
+'Zn': 'Zn_pbe_v1.uspp.F.UPF',
+'La': 'La.GGA-PBE-paw-v1.0.UPF',
+'Zr': 'Zr_pbe_v1.uspp.F.UPF',
+'Lu': 'Lu.GGA-PBE-paw-v1.0.UPF',
+'Ag': 'ag_pbe_v1.4.uspp.F.UPF',
+'Mn': 'Mn.pbe-spn-kjpaw_psl.0.3.1.UPF',
+'Br': 'br_pbe_v1.4.uspp.F.UPF',
+'Mo': 'Mo_ONCV_PBE-1.0.upf',
+'Cr': 'cr_pbe_v1.5.uspp.F.UPF',
+'N': 'N.pbe.theos.UPF',
+'F': 'f_pbe_v1.4.uspp.F.UPF',
+'Na': 'Na_pbe_v1.uspp.F.UPF',
+'Li': 'li_pbe_v1.4.uspp.F.UPF',
+'Nb': 'Nb.pbe-spn-kjpaw_psl.0.3.0.UPF',
+'Mg': 'mg_pbe_v1.4.uspp.F.UPF',
+'Nd': 'Nd.GGA-PBE-paw-v1.0.UPF',
+'Ni': 'ni_pbe_v1.4.uspp.F.UPF',
+'Ne': 'Ne.pbe-n-kjpaw_psl.1.0.0.UPF',
+'Sb': 'sb_pbe_v1.4.uspp.F.UPF',
+'O': 'O.pbe-n-kjpaw_psl.0.1.UPF',
+'Ti': 'ti_pbe_v1.4.uspp.F.UPF',
+}
 
 class PWInput(object):
     """
@@ -442,20 +530,43 @@ class PWOutput(object):
     def lattice_type(self):
         return self.data["lattice_type"]
 
+class PWInputSet(MSONable):
+    """
+    Base class for PWscf input sets
+    """
+
+    def __init__(self, structure, **kwargs):
+        self.structure = structure
+        self.kwargs = kwargs
+
+    def write_input(self, path):
+        filename = self.structure.composition.reduced_formula + '.in'
+        self.pwinput.write_file(filename)
+
+    def as_dict(self, verbosity=2):
+        d = MSONable.as_dict(self)
+        if verbosity == 1:
+            d.pop("structure", None)
+        return d
+
 # TODO: calculate optimal Kpoint density
-class PWStaticSet():
+class PWStaticSet(PWInputSet):
     """Return a PWInput object for a typical PWscf static calculation
     """
 
     # TODO: set up default pseudopotentials for everything
-    def __init__(self, struct, pseudo, pseudo_dir=None,
-                 user_kpoints_settings=None):
+    def __init__(self, structure, pseudo=None, pseudo_dir=None,
+                 user_kpoints_settings=None, **kwargs):
+        self.pseudo_dir = pseudo_dir
+        self.user_kpoints_settings = user_kpoints_settings
+        # use the SSSP accurate pseudopotentials
+        self.pseudo = pseudo or SSSP_accurate
         if pseudo_dir is None:
             pseudo_dir = os.environ['PSEUDO_DIR']
         pw_relax_dict = {
             'control': {
                 'calculation': 'scf',  # do a static calculation
-                'prefix': struct.composition.reduced_formula,
+                'prefix': structure.composition.reduced_formula,
                 'outdir': './',
                 'etot_conv_thr': 10 ** -6,
             # energy convergence criteria for relaxation. Default 10^-4
@@ -468,7 +579,7 @@ class PWStaticSet():
                 'ecutwfc': 130,
                 # TODO: set this automatically. Determine the cutoffs independently
                 'ecutrho': 6 * 130,
-                'ntyp': len(struct.types_of_specie),
+                'ntyp': len(structure.types_of_specie),
                 # default is 4*ecutwfc. Manual says should be higher for PAW, esp. if vacuum or non-linear core
             },
             'kpoints_shift': (0, 0, 0)
@@ -482,26 +593,28 @@ class PWStaticSet():
             pw_relax_dict['kpoints_grid'] = (11, 11, 11)
 
         # pass only the correct psedopotentials
-        pseudo = {str(sp): pseudo[str(sp)] for sp in struct.species}
-        self.pwinput = PWInput(struct, pseudo=pseudo, **pw_relax_dict)
-
-    def write_input(self, filename):
-        self.pwinput.write_file(filename)
+        self.pseudo = {str(sp): self.pseudo[str(sp)] for sp in structure.species}
+        self.pwinput = PWInput(structure, pseudo=self.pseudo, **pw_relax_dict)
+        super(PWStaticSet, self).__init__(structure, **kwargs)
 
 # TODO: Refactor to subclass PWStaticSet
-class PWRelaxSet():
+class PWRelaxSet(PWInputSet):
     """Return a PWInput object for a typical PWscf relaxation
     """
 
     # TODO: set up default pseudopotentials for everything
-    def __init__(self, struct, pseudo, pseudo_dir=None,
-                 user_kpoints_settings=None):
+    def __init__(self, structure, pseudo=None, pseudo_dir=None,
+                 user_kpoints_settings=None, **kwargs):
+        self.pseudo_dir = pseudo_dir
+        self.user_kpoints_settings = user_kpoints_settings
+        # use the SSSP accurate pseudopotentials
+        self.pseudo = pseudo or SSSP_accurate
         if pseudo_dir is None:
             pseudo_dir = os.environ['PSEUDO_DIR']
         pw_relax_dict = {
             'control': {
-                'calculation': 'vc-relax',  # do a variable cell relaxation
-                'prefix': struct.composition.reduced_formula,
+                'calculation': 'relax',  # do a variable cell relaxation
+                'prefix': structure.composition.reduced_formula,
                 'outdir': './',
                 'nstep': 100,  # take 100 ionic steps
                 'etot_conv_thr': 10 ** -6,
@@ -514,7 +627,7 @@ class PWRelaxSet():
                 'ecutwfc': 200,
             # TODO: set this automatically. Determine the cutoffs independently
                 'ecutrho': 6 * 200,
-                'ntyp': len(struct.types_of_specie),
+                'ntyp': len(structure.types_of_specie),
             # default is 4*ecutwfc. Manual says should be higher for PAW, esp. if vacuum or non-linear core
             },
             'kpoints_shift': (0, 0, 0)
@@ -528,11 +641,9 @@ class PWRelaxSet():
             pw_relax_dict['kpoints_grid'] = (11, 11, 11)
 
         # pass only the correct psedopotentials
-        pseudo = {str(sp): pseudo[str(sp)] for sp in struct.species}
-        self.pwinput = PWInput(struct, pseudo=pseudo, **pw_relax_dict)
-
-    def write_input(self, filename):
-        self.pwinput.write_file(filename)
+        self.pseudo = {str(sp): self.pseudo[str(sp)] for sp in structure.species}
+        self.pwinput = PWInput(structure, pseudo=self.pseudo, **pw_relax_dict)
+        super(PWRelaxSet, self).__init__(structure, **kwargs)
 
 
 class PWData(PWOutput):
